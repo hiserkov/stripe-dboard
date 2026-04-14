@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
+import { RowsPerPage } from "@/components/ui/RowsPerPage";
 
 interface CustomerRow {
   id: string;
@@ -45,6 +46,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [data, setData] = useState<CustomerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function CustomersPage() {
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    const qs = new URLSearchParams({ page: String(page) });
+    const qs = new URLSearchParams({ page: String(page), limit: String(pageSize) });
     if (debouncedSearch) qs.set("q", debouncedSearch);
     fetch(`/api/customers?${qs}`)
       .then((r) => r.json())
@@ -71,11 +73,12 @@ export default function CustomersPage() {
         setTotal(Number(json.total ?? 0));
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch]);
+  }, [page, pageSize, debouncedSearch]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setPage(1); }, [pageSize, debouncedSearch]);
 
-  const totalPages = Math.max(1, Math.ceil(total / 50));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="flex min-h-screen bg-[#f6f9fc]">
@@ -198,29 +201,18 @@ export default function CustomersPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] text-[#64748d]" style={{ fontFeatureSettings: '"ss01"' }}>
-              {total > 0
-                ? `Showing ${Math.min((page - 1) * 50 + 1, total)}–${Math.min(page * 50, total)} of ${total.toLocaleString()} customers`
-                : "No customers"}
-            </span>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <RowsPerPage value={pageSize} onChange={setPageSize} />
+              <span className="text-[13px] text-[#64748d]" style={{ fontFeatureSettings: '"ss01"' }}>
+                {total > 0
+                  ? `${Math.min((page - 1) * pageSize + 1, total).toLocaleString()}–${Math.min(page * pageSize, total).toLocaleString()} of ${total.toLocaleString()} customers`
+                  : "No customers"}
+              </span>
+            </div>
             <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                ← Previous
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-              >
-                Next →
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Previous</Button>
+              <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next →</Button>
             </div>
           </div>
         </main>

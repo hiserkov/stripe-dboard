@@ -5,7 +5,7 @@ import { and, gte, lte, ilike, or, desc, asc, count, eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
-const PAGE_SIZE = 25;
+const VALID_LIMITS = new Set([25, 50, 100, 200]);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -14,6 +14,11 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search")?.trim() ?? "";
   const reportNumber = searchParams.get("report") ?? "all";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const rawLimit = parseInt(searchParams.get("limit") ?? "25", 10);
+  const PAGE_SIZE = VALID_LIMITS.has(rawLimit) ? rawLimit : 25;
+
+  const sortBy = searchParams.get("sortBy") === "line_number" ? "line_number" : "fill_date";
+  const sortDir = searchParams.get("sortDir") === "asc" ? "asc" : "desc";
 
   const filters = [];
   if (from) filters.push(gte(rxPrescriptions.fillDate, from));
@@ -63,7 +68,13 @@ export async function GET(req: NextRequest) {
     })
     .from(rxPrescriptions)
     .where(whereClause)
-    .orderBy(desc(rxPrescriptions.fillDate), asc(rxPrescriptions.lineNumber))
+    .orderBy(
+      sortBy === "line_number"
+        ? (sortDir === "asc" ? asc(rxPrescriptions.lineNumber) : desc(rxPrescriptions.lineNumber))
+        : (sortDir === "asc" ? asc(rxPrescriptions.fillDate)   : desc(rxPrescriptions.fillDate)),
+      // secondary sort always keeps rows stable
+      sortBy === "line_number" ? asc(rxPrescriptions.fillDate) : asc(rxPrescriptions.lineNumber)
+    )
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 

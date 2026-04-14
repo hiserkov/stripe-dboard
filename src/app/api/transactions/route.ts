@@ -7,7 +7,7 @@ import { PRESCRIBER_FEE_CENTS } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
-const PAGE_SIZE = 20;
+const VALID_LIMITS = new Set([25, 50, 100, 200]);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -15,6 +15,8 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get("from") ?? undefined;
   const to = searchParams.get("to") ?? undefined;
   const page = parseInt(searchParams.get("page") ?? "1", 10);
+  const rawLimit = parseInt(searchParams.get("limit") ?? "25", 10);
+  const PAGE_SIZE = VALID_LIMITS.has(rawLimit) ? rawLimit : 25;
   const status = searchParams.get("status") ?? "all";
 
   const { start, end } = resolveDateRange(preset, from, to);

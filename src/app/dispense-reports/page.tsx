@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
+import { RowsPerPage } from "@/components/ui/RowsPerPage";
 
 interface RxRow {
   id: number;
@@ -78,6 +79,7 @@ export default function DispenseReportsPage() {
   const [to, setTo] = useState("");
   const [selectedReport, setSelectedReport] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState<RxRow[]>([]);
   const [reports, setReports] = useState<ReportOption[]>([]);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
@@ -93,13 +95,13 @@ export default function DispenseReportsPage() {
   }, [search]);
 
   const buildQs = useCallback(() => {
-    const qs = new URLSearchParams({ page: String(page) });
+    const qs = new URLSearchParams({ page: String(page), limit: String(pageSize) });
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     if (debouncedSearch) qs.set("search", debouncedSearch);
     if (selectedReport !== "all") qs.set("report", selectedReport);
     return qs.toString();
-  }, [from, to, debouncedSearch, selectedReport, page]);
+  }, [from, to, debouncedSearch, selectedReport, page, pageSize]);
 
   useEffect(() => {
     setLoading(true);
@@ -113,8 +115,8 @@ export default function DispenseReportsPage() {
       .finally(() => setLoading(false));
   }, [buildQs]);
 
-  // Reset to page 1 on filter change
-  useEffect(() => { setPage(1); }, [from, to, debouncedSearch, selectedReport]);
+  // Reset to page 1 on filter or page size change
+  useEffect(() => { setPage(1); }, [from, to, debouncedSearch, selectedReport, pageSize]);
 
   const allSelected = data.length > 0 && data.every((r) => selected.has(r.id));
   const someSelected = data.some((r) => selected.has(r.id));
@@ -387,27 +389,18 @@ export default function DispenseReportsPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] text-[#64748d]" style={{ fontFeatureSettings: '"ss01"' }}>
-              {pagination.total === 0
-                ? "No results"
-                : `Showing ${((page - 1) * 25 + 1).toLocaleString()}–${Math.min(page * 25, pagination.total).toLocaleString()} of ${pagination.total.toLocaleString()} prescriptions`}
-            </span>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <RowsPerPage value={pageSize} onChange={setPageSize} />
+              <span className="text-[13px] text-[#64748d]" style={{ fontFeatureSettings: '"ss01"' }}>
+                {pagination.total === 0
+                  ? "No results"
+                  : `${((page - 1) * pageSize + 1).toLocaleString()}–${Math.min(page * pageSize, pagination.total).toLocaleString()} of ${pagination.total.toLocaleString()} prescriptions`}
+              </span>
+            </div>
             <div className="flex gap-2">
-              <Button
-                variant="ghost" size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                ← Previous
-              </Button>
-              <Button
-                variant="ghost" size="sm"
-                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                disabled={page >= pagination.totalPages}
-              >
-                Next →
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Previous</Button>
+              <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}>Next →</Button>
             </div>
           </div>
 

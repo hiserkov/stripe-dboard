@@ -9,6 +9,7 @@ import {
   RevenueChart, VolumeChart, FeeChart, NetMarginChart, RevenueByMedChart,
 } from "@/components/dashboard/Charts";
 import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
+import { RowsPerPage } from "@/components/ui/RowsPerPage";
 
 function fmt(cents: number) {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -33,6 +34,7 @@ export default function DashboardPage() {
     medicationName: string | null; stripeCreatedAt: string;
   }[]>(null);
   const [loading, setLoading] = useState(true);
+  const [txPageSize, setTxPageSize] = useState(25);
 
   const buildQs = useCallback((f: DateFilterState) => {
     const p = new URLSearchParams({ preset: f.preset });
@@ -46,13 +48,13 @@ export default function DashboardPage() {
     const qs = buildQs(filter);
     Promise.all([
       fetch(`/api/dashboard?${qs}`).then((r) => r.json()),
-      fetch(`/api/transactions?${qs}&page=1`).then((r) => r.json()),
+      fetch(`/api/transactions?${qs}&page=1&limit=${txPageSize}`).then((r) => r.json()),
     ]).then(([dash, tx]) => {
       setKpi(dash.kpi);
       setCharts(dash.charts);
-      setRecentTx(tx.data?.slice(0, 20) ?? []);
+      setRecentTx(tx.data ?? []);
     }).finally(() => setLoading(false));
-  }, [filter, buildQs]);
+  }, [filter, txPageSize, buildQs]);
 
   return (
     <div className="flex min-h-screen bg-[#f6f9fc]">
@@ -97,6 +99,7 @@ export default function DashboardPage() {
             </h2>
             <div className="w-full overflow-x-auto rounded-[6px] border border-[#e5edf5] [box-shadow:rgba(23,23,23,0.06)_0px_3px_6px] bg-white">
               <table className="w-full text-[13px]" style={{ fontFeatureSettings: '"ss01"' }}>
+
                 <thead>
                   <tr className="border-b border-[#e5edf5] bg-[#f8fafc]">
                     {["Date", "Customer", "Medication", "Gross", "Stripe fee", "Med cost", "Net", "Status"].map((col) => (
@@ -132,6 +135,10 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+              {/* Rows per page — bottom of card */}
+              <div className="px-4 py-2.5 border-t border-[#e5edf5] flex items-center">
+                <RowsPerPage value={txPageSize} onChange={setTxPageSize} />
+              </div>
             </div>
           </div>
         </main>

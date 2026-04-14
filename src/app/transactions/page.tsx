@@ -6,6 +6,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { DateFilter, type DateFilterState } from "@/components/dashboard/DateFilter";
 import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { RowsPerPage } from "@/components/ui/RowsPerPage";
 
 interface TxRow {
   id: string;
@@ -35,13 +36,14 @@ export default function TransactionsPage() {
   const [filter, setFilter] = useState<DateFilterState>({ preset: "this_month" });
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState<TxRow[]>([]);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const buildQs = useCallback((f: DateFilterState, s: string, p: number) => {
-    const qs = new URLSearchParams({ preset: f.preset, status: s, page: String(p) });
+  const buildQs = useCallback((f: DateFilterState, s: string, p: number, limit: number) => {
+    const qs = new URLSearchParams({ preset: f.preset, status: s, page: String(p), limit: String(limit) });
     if (f.from) qs.set("from", f.from);
     if (f.to) qs.set("to", f.to);
     return qs.toString();
@@ -49,17 +51,17 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/transactions?${buildQs(filter, status, page)}`)
+    fetch(`/api/transactions?${buildQs(filter, status, page, pageSize)}`)
       .then((r) => r.json())
       .then((json) => {
         setData(json.data ?? []);
         setPagination(json.pagination ?? { total: 0, totalPages: 1 });
       })
       .finally(() => setLoading(false));
-  }, [filter, status, page, buildQs]);
+  }, [filter, status, page, pageSize, buildQs]);
 
-  // Reset page when filter or status changes
-  useEffect(() => { setPage(1); }, [filter, status]);
+  // Reset to page 1 when filter, status or page size changes
+  useEffect(() => { setPage(1); }, [filter, status, pageSize]);
 
   const allSelected = data.length > 0 && data.every((r) => selected.has(r.id));
   const someSelected = data.some((r) => selected.has(r.id));
@@ -161,13 +163,18 @@ export default function TransactionsPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] text-[#64748d]" style={{ fontFeatureSettings: '"ss01"' }}>
-              Showing {Math.min((page - 1) * 20 + 1, pagination.total)}–{Math.min(page * 20, pagination.total)} of {pagination.total.toLocaleString()} transactions
-            </span>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <RowsPerPage value={pageSize} onChange={setPageSize} />
+              <span className="text-[13px] text-[#64748d]" style={{ fontFeatureSettings: '"ss01"' }}>
+                {pagination.total > 0
+                  ? `${Math.min((page - 1) * pageSize + 1, pagination.total).toLocaleString()}–${Math.min(page * pageSize, pagination.total).toLocaleString()} of ${pagination.total.toLocaleString()}`
+                  : "No results"}
+              </span>
+            </div>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Previous</Button>
-              <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages}>Next →</Button>
+              <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}>Next →</Button>
             </div>
           </div>
         </main>

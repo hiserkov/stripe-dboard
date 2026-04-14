@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const limit = 50;
+  const rawLimit = parseInt(searchParams.get("limit") ?? "50", 10);
+  const limit = [25, 50, 100, 200].includes(rawLimit) ? rawLimit : 50;
   const offset = (page - 1) * limit;
   const search = searchParams.get("q") ?? "";
 
