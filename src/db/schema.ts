@@ -6,6 +6,8 @@ import {
   boolean,
   jsonb,
   index,
+  date,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +56,62 @@ export const paymentIntents = pgTable(
     index("pi_order_idx").on(t.orderId),
   ]
 );
+
+// ---------------------------------------------------------------------------
+// RXCS Dispense Reports — written by rxsc-sverka PDF parser
+// ---------------------------------------------------------------------------
+export const dispenseReports = pgTable("dispense_reports", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  reportNumber: text("report_number").notNull().unique(),
+  invoiceNumber: text("invoice_number"),
+  clinic: text("clinic"),
+  dateRangeStart: date("date_range_start"),
+  dateRangeEnd: date("date_range_end"),
+  prescriptionCount: integer("prescription_count"),
+  subtotal: numeric("subtotal"),
+  shipping: numeric("shipping"),
+  total: numeric("total"),
+  generatedDate: date("generated_date"),
+  sourceFilename: text("source_filename"),
+  importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow(),
+});
+
+export const rxPrescriptions = pgTable(
+  "prescriptions",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    reportId: integer("report_id"),
+    lineNumber: integer("line_number"),
+    rxNumber: text("rx_number"),
+    patientName: text("patient_name"),
+    drugName: text("drug_name"),
+    quantity: integer("quantity"),
+    fillDate: date("fill_date"),
+    pickup: text("pickup"),
+    trackingNumber: text("tracking_number"),
+    prescriberName: text("prescriber_name"),
+    prescriberClinic: text("prescriber_clinic"),
+    clinicName: text("clinic_name"),
+    price: numeric("price"),
+  },
+  (t) => [
+    index("rx_fill_date_idx").on(t.fillDate),
+    index("rx_patient_idx").on(t.patientName),
+    index("rx_drug_idx").on(t.drugName),
+    index("rx_prescriber_idx").on(t.prescriberName),
+    index("rx_report_id_idx").on(t.reportId),
+  ]
+);
+
+export const rxShippingItems = pgTable("shipping_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  reportId: integer("report_id"),
+  trackingNumber: text("tracking_number"),
+  shippingMethod: text("shipping_method"),
+  inOutState: text("in_out_state"),
+  items: integer("items"),
+  price: numeric("price"),
+});
 
 // ---------------------------------------------------------------------------
 // Sync log — tracks last successful sync cursor so cron only fetches new data

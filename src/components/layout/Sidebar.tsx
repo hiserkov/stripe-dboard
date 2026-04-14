@@ -47,6 +47,12 @@ const icons: Record<string, React.ReactNode> = {
       <path d="M8 1v14M2 4.5l6 3.5 6-3.5" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   ),
+  pill: (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="5.5" width="13" height="5" rx="2.5" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="8" y1="5.5" x2="8" y2="10.5" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  ),
 };
 
 const navGroups: NavGroup[] = [
@@ -56,6 +62,7 @@ const navGroups: NavGroup[] = [
       { label: "Home", icon: "home", href: "/" },
       { label: "Transactions", icon: "list", href: "/transactions" },
       { label: "Medications", icon: "box", href: "/medications" },
+      { label: "Dispense Reports", icon: "pill", href: "/dispense-reports" },
     ],
   },
 ];
