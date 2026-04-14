@@ -59,6 +59,19 @@ const DRUG_COLORS: Record<string, { bg: string; text: string }> = {
   "RXCS":        { bg: "rgba(23,23,23,0.06)", text: "#273951" },
 };
 
+function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: active ? 1 : 0.35 }}>
+      {dir === "asc" || !active ? (
+        <path d="M5 2L8 6H2L5 2Z" fill={active ? "#533afd" : "currentColor"} />
+      ) : null}
+      {dir === "desc" || !active ? (
+        <path d="M5 8L2 4H8L5 8Z" fill={active && dir === "desc" ? "#533afd" : "currentColor"} style={{ opacity: active && dir === "asc" ? 0 : 1 }} />
+      ) : null}
+    </svg>
+  );
+}
+
 function DrugBadge({ name }: { name: string }) {
   const key = Object.keys(DRUG_COLORS).find((k) => name.toUpperCase().startsWith(k));
   const style = key ? DRUG_COLORS[key] : { bg: "rgba(23,23,23,0.06)", text: "#273951" };
@@ -80,6 +93,18 @@ export default function DispenseReportsPage() {
   const [selectedReport, setSelectedReport] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [sortBy, setSortBy] = useState<"fill_date" | "line_number">("fill_date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const toggleSort = (col: "fill_date" | "line_number") => {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir(col === "line_number" ? "asc" : "desc");
+    }
+    setPage(1);
+  };
   const [data, setData] = useState<RxRow[]>([]);
   const [reports, setReports] = useState<ReportOption[]>([]);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
@@ -95,13 +120,13 @@ export default function DispenseReportsPage() {
   }, [search]);
 
   const buildQs = useCallback(() => {
-    const qs = new URLSearchParams({ page: String(page), limit: String(pageSize) });
+    const qs = new URLSearchParams({ page: String(page), limit: String(pageSize), sortBy, sortDir });
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     if (debouncedSearch) qs.set("search", debouncedSearch);
     if (selectedReport !== "all") qs.set("report", selectedReport);
     return qs.toString();
-  }, [from, to, debouncedSearch, selectedReport, page, pageSize]);
+  }, [from, to, debouncedSearch, selectedReport, page, pageSize, sortBy, sortDir]);
 
   useEffect(() => {
     setLoading(true);
@@ -115,8 +140,8 @@ export default function DispenseReportsPage() {
       .finally(() => setLoading(false));
   }, [buildQs]);
 
-  // Reset to page 1 on filter or page size change
-  useEffect(() => { setPage(1); }, [from, to, debouncedSearch, selectedReport, pageSize]);
+  // Reset to page 1 on filter, page size, or sort change
+  useEffect(() => { setPage(1); }, [from, to, debouncedSearch, selectedReport, pageSize, sortBy, sortDir]);
 
   const allSelected = data.length > 0 && data.every((r) => selected.has(r.id));
   const someSelected = data.some((r) => selected.has(r.id));
@@ -263,10 +288,30 @@ export default function DispenseReportsPage() {
                       className="w-3.5 h-3.5 accent-[#533afd] cursor-pointer"
                     />
                   </th>
-                  {[
-                    "Fill Date", "RX #", "Patient", "Drug", "Qty",
-                    "Tracking #", "Prescriber", "Price",
-                  ].map((col) => (
+                  {/* Sortable: # */}
+                  <th
+                    className="px-4 py-3 text-left text-[11px] font-normal uppercase whitespace-nowrap cursor-pointer select-none group"
+                    style={{ letterSpacing: "0.04em", color: sortBy === "line_number" ? "#533afd" : "#64748d" }}
+                    onClick={() => toggleSort("line_number")}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      #
+                      <SortIcon active={sortBy === "line_number"} dir={sortDir} />
+                    </span>
+                  </th>
+                  {/* Sortable: Fill Date */}
+                  <th
+                    className="px-4 py-3 text-left text-[11px] font-normal uppercase whitespace-nowrap cursor-pointer select-none"
+                    style={{ letterSpacing: "0.04em", color: sortBy === "fill_date" ? "#533afd" : "#64748d" }}
+                    onClick={() => toggleSort("fill_date")}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Fill Date
+                      <SortIcon active={sortBy === "fill_date"} dir={sortDir} />
+                    </span>
+                  </th>
+                  {/* Static columns */}
+                  {["RX #", "Patient", "Drug", "Qty", "Tracking #", "Prescriber", "Price"].map((col) => (
                     <th
                       key={col}
                       className="px-4 py-3 text-left text-[11px] font-normal text-[#64748d] uppercase whitespace-nowrap"
@@ -280,7 +325,7 @@ export default function DispenseReportsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-[#64748d]">
+                    <td colSpan={10} className="px-4 py-12 text-center text-[#64748d]">
                       <span className="inline-flex items-center gap-2">
                         <svg className="animate-spin" width="14" height="14" viewBox="0 0 16 16" fill="none">
                           <circle cx="8" cy="8" r="6" stroke="#e5edf5" strokeWidth="2" />
@@ -292,7 +337,7 @@ export default function DispenseReportsPage() {
                   </tr>
                 ) : data.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-[#64748d]">
+                    <td colSpan={10} className="px-4 py-12 text-center text-[#64748d]">
                       No prescriptions found
                       {hasFilters && (
                         <button onClick={clearFilters} className="ml-2 text-[#533afd] hover:underline">
@@ -316,6 +361,14 @@ export default function DispenseReportsPage() {
                         onChange={() => toggleRow(rx.id)}
                         className="w-3.5 h-3.5 accent-[#533afd] cursor-pointer"
                       />
+                    </td>
+
+                    {/* Line # */}
+                    <td
+                      className="px-4 py-3 text-[#b0b8c8] text-right whitespace-nowrap"
+                      style={{ fontFeatureSettings: '"tnum"', minWidth: "2.5rem" }}
+                    >
+                      {rx.lineNumber ?? "—"}
                     </td>
 
                     {/* Fill date */}
