@@ -102,8 +102,9 @@ try {
       await db.insert(medications).values({
         id: p.id, name: p.name, costCents: 0, active: p.active, updatedAt: new Date(),
       }).onConflictDoUpdate({
-        target: medications.id,
-        set: { name: p.name, active: p.active },
+        // Conflict on name — preserves cost_cents set by the user
+        target: medications.name,
+        set: { active: p.active, updatedAt: new Date() },
       });
       results.medications++;
     }

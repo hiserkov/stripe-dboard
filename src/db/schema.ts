@@ -8,6 +8,7 @@ import {
   index,
   date,
   numeric,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -33,7 +34,9 @@ export const medications = pgTable("medications", {
   costCents: integer("cost_cents").notNull().default(0),
   active: boolean("active").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  unique("medications_name_unique").on(t.name),
+]);
 
 // ---------------------------------------------------------------------------
 // Payment intents — synced from Stripe via webhook + cron backfill

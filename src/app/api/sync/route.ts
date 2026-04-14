@@ -38,9 +38,10 @@ export async function GET(req: NextRequest) {
             active: product.active,
             updatedAt: new Date(),
           })
+          // Conflict on name — preserves cost_cents set by the user
           .onConflictDoUpdate({
-            target: medications.id,
-            set: { name: product.name, active: product.active },
+            target: medications.name,
+            set: { active: product.active, updatedAt: new Date() },
           });
         results.medications++;
       }
