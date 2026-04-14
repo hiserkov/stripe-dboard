@@ -4,6 +4,83 @@ import { paymentIntents } from "@/db/schema";
 import { stripe } from "./stripe";
 import { sql } from "drizzle-orm";
 
+// ── Fee map ────────────────────────────────────────────────────────────────
+export async function buildFeeMap(
+  stripeClient: Stripe,
+  createdGte: number
+): Promise<Map<string, number>> {
+  const feeMap = new Map<string, number>();
+  let cursor: string | undefined;
+  do {
+    const page = await stripeClient.charges.list({
+      limit: 100,
+      created: { gte: createdGte },
+      expand: ["data.balance_transaction"],
+      ...(cursor ? { starting_after: cursor } : {}),
+    });
+    for (const charge of page.data) {
+      const piId =
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+      const bt = charge.balance_transaction as Stripe.BalanceTransaction | null;
+      if (piId && bt && typeof bt === "object") {
+        feeMap.set(piId, bt.fee);
+      }
+    }
+    cursor = page.has_more ? page.data[page.data.length - 1]?.id : undefined;
+  } while (cursor);
+  return feeMap;
+}
+
+// ── Batch upsert ───────────────────────────────────────────────────────────
+export async function upsertPaymentIntentBatch(
+  pis: Stripe.PaymentIntent[],
+  feeMap: Map<string, number>
+) {
+  if (pis.length === 0) return;
+  const values = pis.map((pi) => {
+    const meta = (pi.metadata ?? {}) as Record<string, string>;
+    const { email, name } = extractCustomer(pi);
+    return {
+      id: pi.id,
+      amountCents: pi.amount,
+      stripeFee: feeMap.get(pi.id) ?? 0,
+      currency: pi.currency,
+      status: pi.status,
+      customerEmail: email,
+      customerName: name,
+      medicationName: meta.med_name ?? null,
+      prescriber: meta.handler ?? null,
+      medCostCents: parseToCents(meta.med_cost),
+      orderId: meta.order_id_rx ?? null,
+      refillNumber: meta.refil_number ?? null,
+      stripeCreatedAt: new Date(pi.created * 1000),
+      metadata: meta,
+    };
+  });
+  await db
+    .insert(paymentIntents)
+    .values(values)
+    .onConflictDoUpdate({
+      target: paymentIntents.id,
+      set: {
+        amountCents: sql`excluded.amount_cents`,
+        stripeFee: sql`excluded.stripe_fee_cents`,
+        status: sql`excluded.status`,
+        customerEmail: sql`excluded.customer_email`,
+        customerName: sql`excluded.customer_name`,
+        medicationName: sql`excluded.medication_name`,
+        prescriber: sql`excluded.prescriber`,
+        medCostCents: sql`excluded.med_cost_cents`,
+        orderId: sql`excluded.order_id`,
+        refillNumber: sql`excluded.refill_number`,
+        metadata: sql`excluded.metadata`,
+        syncedAt: sql`now()`,
+      },
+    });
+}
+
 function parseToCents(val: string | undefined): number {
   if (!val) return 0;
   const n = parseFloat(val.replace(/[^0-9.]/g, ""));
