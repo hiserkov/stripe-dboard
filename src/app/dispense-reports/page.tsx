@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
@@ -182,6 +183,16 @@ export default function DispenseReportsPage() {
                 </p>
               )}
             </div>
+            <Link
+              href="/dispense-reports/imports"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#e5edf5] text-[13px] text-[#64748d] hover:border-[#b9b9f9] hover:text-[#533afd] transition-colors bg-white"
+              style={{ fontFeatureSettings: '"ss01"' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M6 2h4M2 4h12M5 4v8a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Manage imports
+            </Link>
           </div>
 
           {/* Filters row */}

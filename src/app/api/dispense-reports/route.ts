@@ -17,6 +17,15 @@ export async function GET(req: NextRequest) {
   const rawLimit = parseInt(searchParams.get("limit") ?? "25", 10);
   const PAGE_SIZE = VALID_LIMITS.has(rawLimit) ? rawLimit : 25;
 
+  // When only the reports list is needed (imports management page), skip prescriptions query
+  if (searchParams.get("reportsOnly") === "1") {
+    const reports = await db
+      .select()
+      .from(dispenseReports)
+      .orderBy(desc(dispenseReports.importedAt));
+    return NextResponse.json({ reports });
+  }
+
   const sortBy = searchParams.get("sortBy") === "line_number" ? "line_number" : "fill_date";
   const sortDir = searchParams.get("sortDir") === "asc" ? "asc" : "desc";
 
