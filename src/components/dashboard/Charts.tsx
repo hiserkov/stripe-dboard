@@ -111,8 +111,24 @@ export function NetMarginChart({ data }: { data: { period: string; netMarginPerc
   );
 }
 
-function truncateMedName(name: string, maxLen = 28) {
-  return name.length > maxLen ? name.slice(0, maxLen - 1) + "…" : name;
+// Truncate from the START so the differentiating suffix is always visible
+function truncateMedName(name: string, maxLen = 32) {
+  return name.length > maxLen ? "…" + name.slice(-(maxLen - 1)) : name;
+}
+
+interface MedTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+}
+
+function MedTick({ x = 0, y = 0, payload }: MedTickProps) {
+  const label = payload?.value ?? "";
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill={BODY} fontFamily="inherit">
+      {label}
+    </text>
+  );
 }
 
 export function RevenueByMedChart({
@@ -125,15 +141,15 @@ export function RevenueByMedChart({
     fullName: d.medicationName ?? "Unknown",
     grossCents: d.grossCents,
   }));
-  const rowHeight = 32;
-  const chartHeight = Math.max(200, formatted.length * rowHeight + 40);
+  const rowHeight = 34;
+  const chartHeight = Math.max(220, formatted.length * rowHeight + 40);
   return (
     <ChartCard title="Revenue by medication">
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={formatted} layout="vertical" barSize={14} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={BORDER} horizontal={false} />
           <XAxis type="number" tickFormatter={(v) => fmtUSD(v)} tick={{ fontSize: 11, fill: BODY }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: BODY }} axisLine={false} tickLine={false} width={200} />
+          <YAxis type="category" dataKey="name" tick={<MedTick />} axisLine={false} tickLine={false} width={220} />
           <Tooltip
             formatter={(v) => fmtUSD(Number(v))}
             labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}

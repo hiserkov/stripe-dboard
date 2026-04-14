@@ -95,6 +95,7 @@ export default function MedicationsPage() {
   const [meds, setMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch("/api/medications")
@@ -144,6 +145,21 @@ export default function MedicationsPage() {
             </Button>
           </div>
 
+          {/* Search */}
+          <div className="relative max-w-xs">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748d]" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <input
+              type="text"
+              placeholder="Search medications…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-[13px] border border-[#dde3eb] rounded-[6px] bg-white text-[#061b31] placeholder-[#64748d] outline-none focus:border-[#533afd] focus:ring-2 focus:ring-[#533afd]/15 transition"
+            />
+          </div>
+
           <div className="w-full overflow-x-auto rounded-[6px] border border-[#e5edf5] [box-shadow:rgba(23,23,23,0.06)_0px_3px_6px] bg-white">
             <table className="w-full text-[13px]" style={{ fontFeatureSettings: '"ss01"' }}>
               <thead>
@@ -163,7 +179,9 @@ export default function MedicationsPage() {
                       <button onClick={handleSync} className="text-[#533afd] hover:underline">Sync from Stripe</button>
                     </td>
                   </tr>
-                ) : meds.map((med) => (
+                ) : meds.filter(m => m.name.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
+                  <tr><td colSpan={5} className="px-4 py-10 text-center text-[#64748d]">No medications match "{search}"</td></tr>
+                ) : meds.filter(m => m.name.toLowerCase().includes(search.toLowerCase())).map((med) => (
                   <tr key={med.id} className="border-b border-[#e5edf5] last:border-0 hover:bg-[#fafbfc] transition-colors">
                     <td className="px-4 py-3 text-[#061b31] font-normal">{med.name}</td>
                     <td className="px-4 py-3 text-[#64748d] font-mono text-[12px]">{med.id}</td>
