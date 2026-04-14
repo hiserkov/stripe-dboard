@@ -53,11 +53,15 @@ export const paymentIntents = pgTable(
     customerName: text("customer_name"),
 
     // Metadata fields
-    medicationName: text("medication_name"),   // metadata.med_name
+    medicationName: text("medication_name"),   // metadata.med_name || metadata.product_name
     prescriber: text("prescriber"),            // metadata.handler
     medCostCents: integer("med_cost_cents").notNull().default(0), // metadata.med_cost (parsed to cents)
     orderId: text("order_id"),                 // metadata.order_id_rx
     refillNumber: text("refill_number"),       // metadata.refil_number
+    rxUserId: text("rx_user_id"),              // metadata.rx_user_id  — patient ID in RX system
+    productSku: text("product_sku"),           // metadata.product_sku
+    visitId: text("visit_id"),                 // metadata.visitId
+    trackingNumber: text("tracking_number"),   // metadata.tracking_number
 
     stripeCreatedAt: timestamp("stripe_created_at", { withTimezone: true }).notNull(),
     metadata: jsonb("metadata"),
@@ -70,6 +74,8 @@ export const paymentIntents = pgTable(
     index("pi_prescriber_idx").on(t.prescriber),
     index("pi_order_idx").on(t.orderId),
     index("pi_customer_idx").on(t.customerId),
+    index("pi_rx_user_idx").on(t.rxUserId),
+    index("pi_tracking_idx").on(t.trackingNumber),
   ]
 );
 
