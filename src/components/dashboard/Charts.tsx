@@ -111,23 +111,35 @@ export function NetMarginChart({ data }: { data: { period: string; netMarginPerc
   );
 }
 
+function truncateMedName(name: string, maxLen = 28) {
+  return name.length > maxLen ? name.slice(0, maxLen - 1) + "…" : name;
+}
+
 export function RevenueByMedChart({
   data,
 }: {
   data: { medicationName: string | null; grossCents: number }[];
 }) {
   const formatted = data.map((d) => ({
-    name: d.medicationName ?? "Unknown",
+    name: truncateMedName(d.medicationName ?? "Unknown"),
+    fullName: d.medicationName ?? "Unknown",
     grossCents: d.grossCents,
   }));
+  const rowHeight = 32;
+  const chartHeight = Math.max(200, formatted.length * rowHeight + 40);
   return (
     <ChartCard title="Revenue by medication">
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={formatted} layout="vertical" barSize={14}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={formatted} layout="vertical" barSize={14} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={BORDER} horizontal={false} />
           <XAxis type="number" tickFormatter={(v) => fmtUSD(v)} tick={{ fontSize: 11, fill: BODY }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: BODY }} axisLine={false} tickLine={false} width={120} />
-          <Tooltip formatter={(v) => fmtUSD(Number(v))} contentStyle={tooltipStyle} cursor={{ fill: "rgba(83,58,253,0.05)" }} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: BODY }} axisLine={false} tickLine={false} width={200} />
+          <Tooltip
+            formatter={(v) => fmtUSD(Number(v))}
+            labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
+            contentStyle={tooltipStyle}
+            cursor={{ fill: "rgba(83,58,253,0.05)" }}
+          />
           <Bar dataKey="grossCents" fill={STRIPE_PURPLE} radius={[0, 3, 3, 0]} name="Revenue" />
         </BarChart>
       </ResponsiveContainer>

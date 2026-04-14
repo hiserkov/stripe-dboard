@@ -99,7 +99,7 @@ export default function DashboardPage() {
               <table className="w-full text-[13px]" style={{ fontFeatureSettings: '"ss01"' }}>
                 <thead>
                   <tr className="border-b border-[#e5edf5] bg-[#f8fafc]">
-                    {["Date", "Customer", "Medication", "Gross", "Stripe fee", "Med cost", "Prescriber fee", "Net", "Status"].map((col) => (
+                    {["Date", "Customer", "Medication", "Gross", "Stripe fee", "Med cost", "Net", "Status"].map((col) => (
                       <th key={col} className="px-4 py-3 text-left text-[11px] font-normal text-[#64748d] uppercase whitespace-nowrap" style={{ letterSpacing: "0.04em" }}>
                         {col}
                       </th>
@@ -109,7 +109,7 @@ export default function DashboardPage() {
                 <tbody>
                   {!recentTx || loading ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-[#64748d]">
+                      <td colSpan={8} className="px-4 py-8 text-center text-[#64748d]">
                         {loading ? "Loading…" : "No transactions"}
                       </td>
                     </tr>
@@ -126,7 +126,6 @@ export default function DashboardPage() {
                       <td className="px-4 py-3 font-normal text-[#061b31] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.amountCents)}</td>
                       <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.stripeFee)}</td>
                       <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.medCostCents)}</td>
-                      <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.prescriberFeeCents)}</td>
                       <td className="px-4 py-3 font-normal whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"', color: tx.netCents >= 0 ? "#108c3d" : "#c0154f" }}>{fmt(tx.netCents)}</td>
                       <td className="px-4 py-3"><Badge variant={statusToBadgeVariant(tx.status)}>{tx.status}</Badge></td>
                     </tr>

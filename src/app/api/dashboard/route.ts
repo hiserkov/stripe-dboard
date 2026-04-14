@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { paymentIntents, medications } from "@/db/schema";
+import { paymentIntents } from "@/db/schema";
 import { and, gte, lte, eq, sql } from "drizzle-orm";
 import { resolveDateRange, type DatePreset } from "@/lib/date-ranges";
 import { PRESCRIBER_FEE_CENTS } from "@/lib/stripe";
@@ -32,25 +32,15 @@ export async function GET(req: NextRequest) {
     .from(paymentIntents)
     .where(dateFilter);
 
-  // Med costs — join medications on name
-  const medCostRows = await db
+  // Med costs — use stored medCostCents directly from payment_intents
+  const [medCostAgg] = await db
     .select({
-      medicationName: paymentIntents.medicationName,
-      totalMedCost: sql<number>`coalesce(sum(${medications.costCents}), 0)`,
-      txCount: sql<number>`count(*)`,
+      totalMedCost: sql<number>`coalesce(sum(${paymentIntents.medCostCents}), 0)`,
     })
     .from(paymentIntents)
-    .leftJoin(
-      medications,
-      eq(paymentIntents.medicationName, medications.name)
-    )
-    .where(dateFilter)
-    .groupBy(paymentIntents.medicationName);
+    .where(dateFilter);
 
-  const totalMedCostCents = medCostRows.reduce(
-    (acc, r) => acc + Number(r.totalMedCost),
-    0
-  );
+  const totalMedCostCents = Number(medCostAgg.totalMedCost);
   const txCount = Number(kpi.count);
   const grossCents = Number(kpi.grossCents);
   const totalFeesCents = Number(kpi.totalFees);
@@ -73,28 +63,32 @@ export async function GET(req: NextRequest) {
       ? "week"
       : "day";
 
+  // Use sql.raw so the trunc unit is a literal in the query, not a parameter.
+  // When parameterized, GROUP BY $5 ≠ SELECT $1 in Postgres even with same value.
+  const periodExpr = sql<string>`date_trunc(${sql.raw(`'${truncFn}'`)}, ${paymentIntents.stripeCreatedAt})`;
+
   const revenueOverTime = await db
     .select({
-      period: sql<string>`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`,
+      period: periodExpr,
       grossCents: sql<number>`sum(${paymentIntents.amountCents})`,
       count: sql<number>`count(*)`,
     })
     .from(paymentIntents)
     .where(dateFilter)
-    .groupBy(sql`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`)
-    .orderBy(sql`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`);
+    .groupBy(periodExpr)
+    .orderBy(periodExpr);
 
   // ── Fee % over time ───────────────────────────────────────────────────
   const feeOverTime = await db
     .select({
-      period: sql<string>`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`,
+      period: periodExpr,
       grossCents: sql<number>`sum(${paymentIntents.amountCents})`,
       feeCents: sql<number>`sum(${paymentIntents.stripeFee})`,
     })
     .from(paymentIntents)
     .where(dateFilter)
-    .groupBy(sql`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`)
-    .orderBy(sql`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`);
+    .groupBy(periodExpr)
+    .orderBy(periodExpr);
 
   // ── Revenue by medication ─────────────────────────────────────────────
   const revenueByMed = await db
@@ -112,16 +106,16 @@ export async function GET(req: NextRequest) {
   // ── Net margin over time ──────────────────────────────────────────────
   const netOverTime = await db
     .select({
-      period: sql<string>`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`,
+      period: periodExpr,
       grossCents: sql<number>`sum(${paymentIntents.amountCents})`,
       feeCents: sql<number>`sum(${paymentIntents.stripeFee})`,
+      medCostCents: sql<number>`sum(${paymentIntents.medCostCents})`,
       count: sql<number>`count(*)`,
     })
     .from(paymentIntents)
-    .leftJoin(medications, eq(paymentIntents.medicationName, medications.name))
     .where(dateFilter)
-    .groupBy(sql`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`)
-    .orderBy(sql`date_trunc(${truncFn}, ${paymentIntents.stripeCreatedAt})`);
+    .groupBy(periodExpr)
+    .orderBy(periodExpr);
 
   return NextResponse.json({
     kpi: kpiData,
@@ -139,7 +133,7 @@ export async function GET(req: NextRequest) {
         period: r.period,
         netMarginPercent:
           Number(r.grossCents) > 0
-            ? ((Number(r.grossCents) - Number(r.feeCents) - Number(r.count) * PRESCRIBER_FEE_CENTS) /
+            ? ((Number(r.grossCents) - Number(r.feeCents) - Number(r.medCostCents) - Number(r.count) * PRESCRIBER_FEE_CENTS) /
                 Number(r.grossCents)) *
               100
             : 0,

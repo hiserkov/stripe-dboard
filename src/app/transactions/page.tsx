@@ -123,16 +123,16 @@ export default function TransactionsPage() {
                       className="w-3.5 h-3.5 accent-[#533afd] cursor-pointer"
                     />
                   </th>
-                  {["Date", "Order ID", "Customer", "Medication", "Prescriber", "Refill #", "Gross", "Stripe fee", "Med cost", "Prescriber fee", "Net", "Status"].map((col) => (
+                  {["Date", "Order ID", "Customer", "Medication", "Prescriber", "Refill #", "Gross", "Stripe fee", "Med cost", "Net", "Status"].map((col) => (
                     <th key={col} className="px-4 py-3 text-left text-[11px] font-normal text-[#64748d] uppercase whitespace-nowrap" style={{ letterSpacing: "0.04em" }}>{col}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={13} className="px-4 py-10 text-center text-[#64748d]">Loading…</td></tr>
+                  <tr><td colSpan={12} className="px-4 py-10 text-center text-[#64748d]">Loading…</td></tr>
                 ) : data.length === 0 ? (
-                  <tr><td colSpan={13} className="px-4 py-10 text-center text-[#64748d]">No transactions found</td></tr>
+                  <tr><td colSpan={12} className="px-4 py-10 text-center text-[#64748d]">No transactions found</td></tr>
                 ) : data.map((tx) => (
                   <tr key={tx.id} className={["border-b border-[#e5edf5] last:border-0 transition-colors", selected.has(tx.id) ? "bg-[rgba(83,58,253,0.03)]" : "hover:bg-[#fafbfc]"].join(" ")}>
                     <td className="px-4 py-3">
@@ -152,7 +152,6 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 font-normal text-[#061b31] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.amountCents)}</td>
                     <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.stripeFee)}</td>
                     <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.medCostCents)}</td>
-                    <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.prescriberFeeCents)}</td>
                     <td className="px-4 py-3 font-normal whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"', color: tx.netCents >= 0 ? "#108c3d" : "#c0154f" }}>{fmt(tx.netCents)}</td>
                     <td className="px-4 py-3"><Badge variant={statusToBadgeVariant(tx.status)}>{tx.status}</Badge></td>
                   </tr>
