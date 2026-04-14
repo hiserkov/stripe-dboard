@@ -18,6 +18,9 @@ interface TxRow {
   customerName: string | null;
   customerEmail: string | null;
   medicationName: string | null;
+  prescriber: string | null;
+  orderId: string | null;
+  refillNumber: string | null;
   stripeCreatedAt: string;
   currency: string;
 }
@@ -120,16 +123,16 @@ export default function TransactionsPage() {
                       className="w-3.5 h-3.5 accent-[#533afd] cursor-pointer"
                     />
                   </th>
-                  {["Date", "Customer", "Medication", "Gross", "Stripe fee", "Med cost", "Prescriber fee", "Net", "Status"].map((col) => (
+                  {["Date", "Order ID", "Customer", "Medication", "Prescriber", "Refill #", "Gross", "Stripe fee", "Med cost", "Prescriber fee", "Net", "Status"].map((col) => (
                     <th key={col} className="px-4 py-3 text-left text-[11px] font-normal text-[#64748d] uppercase whitespace-nowrap" style={{ letterSpacing: "0.04em" }}>{col}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} className="px-4 py-10 text-center text-[#64748d]">Loading…</td></tr>
+                  <tr><td colSpan={13} className="px-4 py-10 text-center text-[#64748d]">Loading…</td></tr>
                 ) : data.length === 0 ? (
-                  <tr><td colSpan={10} className="px-4 py-10 text-center text-[#64748d]">No transactions found</td></tr>
+                  <tr><td colSpan={13} className="px-4 py-10 text-center text-[#64748d]">No transactions found</td></tr>
                 ) : data.map((tx) => (
                   <tr key={tx.id} className={["border-b border-[#e5edf5] last:border-0 transition-colors", selected.has(tx.id) ? "bg-[rgba(83,58,253,0.03)]" : "hover:bg-[#fafbfc]"].join(" ")}>
                     <td className="px-4 py-3">
@@ -138,11 +141,14 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-[#64748d] whitespace-nowrap">
                       {new Date(tx.stripeCreatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </td>
+                    <td className="px-4 py-3 font-mono text-[12px] text-[#273951] whitespace-nowrap">{tx.orderId ?? "—"}</td>
                     <td className="px-4 py-3">
                       <div className="text-[#061b31]">{tx.customerName ?? "—"}</div>
                       <div className="text-[11px] text-[#64748d]">{tx.customerEmail ?? ""}</div>
                     </td>
                     <td className="px-4 py-3 text-[#273951]">{tx.medicationName ?? "—"}</td>
+                    <td className="px-4 py-3 text-[#273951]">{tx.prescriber ?? "—"}</td>
+                    <td className="px-4 py-3 text-[#64748d]">{tx.refillNumber ?? "—"}</td>
                     <td className="px-4 py-3 font-normal text-[#061b31] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.amountCents)}</td>
                     <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.stripeFee)}</td>
                     <td className="px-4 py-3 text-[#64748d] whitespace-nowrap" style={{ fontFeatureSettings: '"tnum"' }}>{fmt(tx.medCostCents)}</td>

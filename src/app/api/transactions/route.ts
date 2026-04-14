@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { paymentIntents, medications } from "@/db/schema";
-import { and, gte, lte, eq, desc, sql, count } from "drizzle-orm";
+import { paymentIntents } from "@/db/schema";
+import { and, gte, lte, eq, desc, count } from "drizzle-orm";
 import { resolveDateRange, type DatePreset } from "@/lib/date-ranges";
 import { PRESCRIBER_FEE_CENTS } from "@/lib/stripe";
 
@@ -40,23 +40,22 @@ export async function GET(req: NextRequest) {
       customerEmail: paymentIntents.customerEmail,
       customerName: paymentIntents.customerName,
       medicationName: paymentIntents.medicationName,
+      prescriber: paymentIntents.prescriber,
+      medCostCents: paymentIntents.medCostCents,
+      orderId: paymentIntents.orderId,
+      refillNumber: paymentIntents.refillNumber,
       stripeCreatedAt: paymentIntents.stripeCreatedAt,
-      medCostCents: sql<number>`coalesce(m.cost_cents, 0)`,
     })
     .from(paymentIntents)
-    .leftJoin(
-      medications,
-      eq(paymentIntents.medicationName, medications.name)
-    )
     .where(and(...filters))
     .orderBy(desc(paymentIntents.stripeCreatedAt))
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
   const data = rows.map((r) => {
-    const medCost = Number(r.medCostCents);
-    const fee = Number(r.stripeFee);
     const gross = Number(r.amountCents);
+    const fee = Number(r.stripeFee);
+    const medCost = Number(r.medCostCents);
     const net = gross - fee - medCost - PRESCRIBER_FEE_CENTS;
     return {
       ...r,

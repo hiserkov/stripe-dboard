@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   const medCostRows = await db
     .select({
       medicationName: paymentIntents.medicationName,
-      totalMedCost: sql<number>`coalesce(sum(m.cost_cents), 0)`,
+      totalMedCost: sql<number>`coalesce(sum(${medications.costCents}), 0)`,
       txCount: sql<number>`count(*)`,
     })
     .from(paymentIntents)

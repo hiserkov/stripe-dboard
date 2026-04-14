@@ -12,9 +12,9 @@ import {
 // Medications — source of truth for med costs (seeded from Stripe products)
 // ---------------------------------------------------------------------------
 export const medications = pgTable("medications", {
-  id: text("id").primaryKey(), // Stripe product ID
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  costCents: integer("cost_cents").notNull().default(0), // cost in cents, edited inline
+  costCents: integer("cost_cents").notNull().default(0),
   active: boolean("active").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -25,22 +25,33 @@ export const medications = pgTable("medications", {
 export const paymentIntents = pgTable(
   "payment_intents",
   {
-    id: text("id").primaryKey(), // Stripe pi_xxx ID
+    id: text("id").primaryKey(),
     amountCents: integer("amount_cents").notNull(),
-    stripeFee: integer("stripe_fee_cents").notNull().default(0), // populated from Stripe Balance Transaction
+    stripeFee: integer("stripe_fee_cents").notNull().default(0),
     currency: text("currency").notNull().default("usd"),
-    status: text("status").notNull(), // succeeded | failed | canceled | requires_payment_method | ...
+    status: text("status").notNull(),
+
+    // Customer
     customerEmail: text("customer_email"),
     customerName: text("customer_name"),
-    medicationName: text("medication_name"), // raw string from Stripe metadata
+
+    // Metadata fields
+    medicationName: text("medication_name"),   // metadata.med_name
+    prescriber: text("prescriber"),            // metadata.handler
+    medCostCents: integer("med_cost_cents").notNull().default(0), // metadata.med_cost (parsed to cents)
+    orderId: text("order_id"),                 // metadata.order_id_rx
+    refillNumber: text("refill_number"),       // metadata.refil_number
+
     stripeCreatedAt: timestamp("stripe_created_at", { withTimezone: true }).notNull(),
-    metadata: jsonb("metadata"), // full metadata blob for future use
+    metadata: jsonb("metadata"),
     syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("pi_status_idx").on(t.status),
     index("pi_created_idx").on(t.stripeCreatedAt),
     index("pi_med_idx").on(t.medicationName),
+    index("pi_prescriber_idx").on(t.prescriber),
+    index("pi_order_idx").on(t.orderId),
   ]
 );
 
@@ -48,8 +59,8 @@ export const paymentIntents = pgTable(
 // Sync log — tracks last successful sync cursor so cron only fetches new data
 // ---------------------------------------------------------------------------
 export const syncLog = pgTable("sync_log", {
-  id: text("id").primaryKey().default("singleton"), // only ever one row
+  id: text("id").primaryKey().default("singleton"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-  lastStripeCreatedAt: integer("last_stripe_created_at"), // unix timestamp cursor for Stripe API
+  lastStripeCreatedAt: integer("last_stripe_created_at"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

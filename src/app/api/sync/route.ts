@@ -2,22 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { syncLog, medications } from "@/db/schema";
 import { stripe } from "@/lib/stripe";
-import { upsertPaymentIntent } from "@/lib/sync-payment-intent";
+import { upsertPaymentIntentBatch, buildFeeMap } from "@/lib/sync-payment-intent";
 import { eq, sql } from "drizzle-orm";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // Railway cron gives us plenty of time
+export const maxDuration = 60;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
-/**
- * GET /api/sync
- * Called by Railway Cron (with ?secret=xxx) or manually.
- * Backfills Payment Intents from Stripe since last sync cursor.
- * Also syncs Stripe Products → medications table.
- */
 export async function GET(req: NextRequest) {
-  // Simple secret guard so only Railway cron (or you) can trigger this
   const secret = req.nextUrl.searchParams.get("secret");
   if (CRON_SECRET && secret !== CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const results = { paymentIntents: 0, medications: 0, errors: [] as string[] };
 
-  // ── 1. Sync Stripe Products → medications ──────────────────────────────
+  // ── 1. Sync Stripe Products → medications ─────────────────────────────
   try {
     let productCursor: string | undefined;
     do {
@@ -41,17 +34,13 @@ export async function GET(req: NextRequest) {
           .values({
             id: product.id,
             name: product.name,
-            costCents: 0, // user fills this in via the UI
+            costCents: 0,
             active: product.active,
             updatedAt: new Date(),
           })
           .onConflictDoUpdate({
             target: medications.id,
-            set: {
-              name: product.name,
-              active: product.active,
-              // Do NOT overwrite costCents — user manages that
-            },
+            set: { name: product.name, active: product.active },
           });
         results.medications++;
       }
@@ -64,18 +53,20 @@ export async function GET(req: NextRequest) {
     results.errors.push(`products: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // ── 2. Backfill Payment Intents since last cursor ──────────────────────
+  // ── 2. Backfill Payment Intents ────────────────────────────────────────
   try {
-    // Get the sync cursor
     const [log] = await db
       .select()
       .from(syncLog)
       .where(eq(syncLog.id, "singleton"))
       .limit(1);
 
+    // Default: last 90 days on first run
     const createdGte = log?.lastStripeCreatedAt
-      ? log.lastStripeCreatedAt
-      : Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 90; // default: last 90 days
+      ?? Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 90;
+
+    // Build fee map once for the whole date range (one paginated list call)
+    const feeMap = await buildFeeMap(stripe, createdGte);
 
     let cursor: string | undefined;
     let newestCreated = createdGte;
@@ -84,19 +75,15 @@ export async function GET(req: NextRequest) {
       const page = await stripe.paymentIntents.list({
         limit: 100,
         created: { gte: createdGte },
+        expand: ["data.customer"],
         ...(cursor ? { starting_after: cursor } : {}),
       });
 
+      await upsertPaymentIntentBatch(page.data, feeMap);
+      results.paymentIntents += page.data.length;
+
       for (const pi of page.data) {
-        try {
-          await upsertPaymentIntent(pi);
-          results.paymentIntents++;
-          if (pi.created > newestCreated) newestCreated = pi.created;
-        } catch (err) {
-          results.errors.push(
-            `pi ${pi.id}: ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
+        if (pi.created > newestCreated) newestCreated = pi.created;
       }
 
       cursor = page.has_more ? page.data[page.data.length - 1]?.id : undefined;
