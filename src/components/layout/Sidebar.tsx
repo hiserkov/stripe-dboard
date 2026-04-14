@@ -60,6 +60,7 @@ const navGroups: NavGroup[] = [
     label: "Main Navigation",
     items: [
       { label: "Home", icon: "home", href: "/" },
+      { label: "Customers", icon: "users", href: "/customers" },
       { label: "Transactions", icon: "list", href: "/transactions" },
       { label: "Medications", icon: "box", href: "/medications" },
       { label: "Dispense Reports", icon: "pill", href: "/dispense-reports" },
@@ -94,7 +95,9 @@ export function Sidebar() {
             </div>
             <ul className="space-y-px">
               {group.items.map((item) => {
-                const isActive = item.href ? pathname === item.href : false;
+                const isActive = item.href
+                  ? (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/"))
+                  : false;
                 const linkClass = [
                   "flex items-center gap-2.5 px-2 py-1.5 rounded text-[13px] transition-colors",
                   isActive

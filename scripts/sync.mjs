@@ -22,6 +22,7 @@ const paymentIntents = pgTable("payment_intents", {
   stripeFee: integer("stripe_fee_cents").notNull().default(0),
   currency: text("currency").notNull().default("usd"),
   status: text("status").notNull(),
+  customerId: text("customer_id"),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
   medicationName: text("medication_name"),
@@ -56,21 +57,32 @@ function parseToCents(val) {
   return n > 500 ? Math.round(n) : Math.round(n * 100);
 }
 
-/** Extract customer email + name from PI, falling back to receipt_email / shipping */
+/** Extract customer email + name + id from PI, falling back to receipt_email / shipping */
 function extractCustomer(pi) {
   if (pi.customer && typeof pi.customer === "object") {
     return {
+      customerId: pi.customer.id ?? null,
       email: pi.customer.email ?? pi.receipt_email ?? null,
       name: pi.customer.name ?? pi.shipping?.name ?? null,
     };
   }
   return {
+    customerId: typeof pi.customer === "string" ? pi.customer : null,
     email: pi.receipt_email ?? null,
     name: pi.shipping?.name ?? null,
   };
 }
 
-const results = { paymentIntents: 0, medications: 0, fees: 0, errors: [] };
+const customersTable = pgTable("customers", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email"),
+  phone: text("phone"),
+  stripeCreatedAt: timestamp("stripe_created_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+const results = { paymentIntents: 0, medications: 0, customers: 0, fees: 0, errors: [] };
 
 // ── 1. Sync Stripe Products → medications ─────────────────────────────
 console.log("Syncing products...");
@@ -99,8 +111,40 @@ try {
   console.error("  ✗", e.message);
 }
 
-// ── 2. Build fee map via Charges (reliable PI → fee mapping) ──────────
-console.log("Building fee map via charges...");
+// ── 2. Sync Stripe Customers ───────────────────────────────────────────
+console.log("Syncing customers...");
+let customerCount = 0;
+try {
+  let cursor;
+  do {
+    const page = await stripe.customers.list({
+      limit: 100,
+      ...(cursor ? { starting_after: cursor } : {}),
+    });
+    for (const c of page.data) {
+      await db.insert(customersTable).values({
+        id: c.id,
+        name: c.name ?? null,
+        email: c.email ?? null,
+        phone: c.phone ?? null,
+        stripeCreatedAt: c.created ? new Date(c.created * 1000) : null,
+        syncedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: customersTable.id,
+        set: { name: c.name ?? null, email: c.email ?? null, phone: c.phone ?? null, syncedAt: new Date() },
+      });
+      customerCount++;
+    }
+    cursor = page.has_more ? page.data.at(-1)?.id : undefined;
+  } while (cursor);
+  results.customers = customerCount;
+  console.log(`  ✓ ${customerCount} customers`);
+} catch (e) {
+  results.errors.push(`customers: ${e.message}`);
+  console.error("  ✗ customers:", e.message);
+}
+
+// ── 3. Build fee map via Charges (reliable PI → fee mapping) ──────────console.log("Building fee map via charges...");
 const [log] = await db.select().from(syncLog).where(eq(syncLog.id, "singleton")).limit(1);
 const createdGte = log?.lastStripeCreatedAt
   ?? Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 90;
@@ -153,7 +197,7 @@ try {
 
     const values = page.data.map((pi) => {
       const meta = pi.metadata ?? {};
-      const { email, name } = extractCustomer(pi);
+      const { customerId, email, name } = extractCustomer(pi);
       if (pi.created > newestCreated) newestCreated = pi.created;
 
       return {
@@ -162,6 +206,7 @@ try {
         stripeFee: feeMap.get(pi.id) ?? 0,
         currency: pi.currency,
         status: pi.status,
+        customerId,
         customerEmail: email,
         customerName: name,
         medicationName: meta.med_name ?? null,
@@ -181,6 +226,7 @@ try {
           amountCents: sql`excluded.amount_cents`,
           stripeFee: sql`excluded.stripe_fee_cents`,
           status: sql`excluded.status`,
+          customerId: sql`excluded.customer_id`,
           customerEmail: sql`excluded.customer_email`,
           customerName: sql`excluded.customer_name`,
           medicationName: sql`excluded.medication_name`,

@@ -11,6 +11,20 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
+// Customers — synced from Stripe
+// ---------------------------------------------------------------------------
+export const customers = pgTable("customers", {
+  id: text("id").primaryKey(),           // Stripe cus_xxx
+  name: text("name"),
+  email: text("email"),
+  phone: text("phone"),
+  stripeCreatedAt: timestamp("stripe_created_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("cust_email_idx").on(t.email),
+]);
+
+// ---------------------------------------------------------------------------
 // Medications — source of truth for med costs (seeded from Stripe products)
 // ---------------------------------------------------------------------------
 export const medications = pgTable("medications", {
@@ -34,6 +48,7 @@ export const paymentIntents = pgTable(
     status: text("status").notNull(),
 
     // Customer
+    customerId: text("customer_id"),      // Stripe cus_xxx
     customerEmail: text("customer_email"),
     customerName: text("customer_name"),
 
@@ -54,6 +69,7 @@ export const paymentIntents = pgTable(
     index("pi_med_idx").on(t.medicationName),
     index("pi_prescriber_idx").on(t.prescriber),
     index("pi_order_idx").on(t.orderId),
+    index("pi_customer_idx").on(t.customerId),
   ]
 );
 
