@@ -30,7 +30,9 @@ export async function POST(req: NextRequest) {
   // Forward to the Python service
   let upstream: Response;
   try {
-    upstream = await fetch(`${parserUrl.replace(/\/$/, "")}/parse`, {
+    const base = parserUrl.replace(/\/$/, "");
+    const url = /^https?:\/\//.test(base) ? base : `https://${base}`;
+    upstream = await fetch(`${url}/parse`, {
       method: "POST",
       body: formData,
     });
